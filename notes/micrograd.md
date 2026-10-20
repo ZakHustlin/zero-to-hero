@@ -42,5 +42,19 @@ f(x) = 3x² − 4x + 5, so f′(x) = 6x − 4
 - Key sentence: nudging a by h changes a*b by b·h, so ∂d/∂a = b. For a product, the local derivative with respect to one input is the other input. This is the local step of backprop.
 - Block 2 complete.
 
-## Open question
+### Block 3: Value class
+- `__repr__`, `__add__`, `__mul__`, `__radd__`/`__rmul__` (needed for 1 + a; fine because + and × are commutative, would fail for subtraction).
+- `self` = the object the method is called on; `a*b` → `Value.__mul__(a, b)`.
+- `_prev` holds parent *Values* (direct parents only), not operations. It's a set: `e = a + a` gives `{a}`, so the duplicate is lost. That's a clue for the = vs += gradient bug in micrograd 2.
+- `trace` is a depth-first search back through `_prev`. The `if v not in nodes` check stops shared subgraphs being walked again.
+- ✗ Bug I wrote: `__mul__` used `+`, so L came out as 7 instead of −8. My hand prediction caught it.
+- The graph links objects, not names: reassigning `e` afterwards doesn't change the drawing.
+- If `__add__` mutated self, inputs would be overwritten and d and e would be the same node. Every operation must return a new Value.
+- micrograd 1 complete.
+
+### Reflection
+- Learned: classes can record how values were made, giving a graph you can walk. Error orders: forward ∝ h, central ∝ h².
+- Surprise: making h smaller made the answer *worse* (floating point).
+- Question: how does backprop get ∂L/∂a for a node several steps from L, without nudging every input?
+
 Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical one?
