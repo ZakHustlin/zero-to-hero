@@ -34,5 +34,13 @@ f(x) = 3x² − 4x + 5, so f′(x) = 6x − 4
   - Why: (3+h)³ − (3−h)³ = 54h + 2h³. The even-power terms cancel and the odd ones double, so ÷2h gives 27 + h². A balanced step cancels the h-error term. (I slipped on the signs in the subtraction first.)
 - Block 1 complete.
 
+### Block 2: several inputs (d = a*b + c, a=2, b=−3, c=10)
+- d = 4 ✓. Signs for nudging a (down), b (up) and c (up) all correct ✓.
+- First reported raw differences instead of dividing by h. My `dif` line computed d1 − d2 (backwards) and one print label was wrong.
+- ∂d/∂a = b = −3, ∂d/∂b = a = 2 ✓ (I swapped them at first).
+- ✗ Said ∂d/∂c = ab, then = d. It's 1: the derivative is the *rate of change*, not the value of the output.
+- Key sentence: nudging a by h changes a*b by b·h, so ∂d/∂a = b. For a product, the local derivative with respect to one input is the other input. This is the local step of backprop.
+- Block 2 complete.
+
 ## Open question
 Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical one?
