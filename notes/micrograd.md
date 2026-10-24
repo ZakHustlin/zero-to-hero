@@ -58,3 +58,46 @@ f(x) = 3x² − 4x + 5, so f′(x) = 6x − 4
 - Question: how does backprop get ∂L/∂a for a node several steps from L, without nudging every input?
 
 Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical one?
+
+## Session 3: 22 Oct 2026 (micrograd 2: manual backprop, video ~0:32 to ~1:09)
+
+### Block 0: carry-over
+- L.data = -8, 7 Value boxes + 3 op ovals: all predicted correctly.
+- e = a + a: said the picture is unchanged (right) but gave the wrong reason ("class variable").
+- ✗ Predicted e.data = -6 after e = a + a. It's 4: the name e now points to the new object.
+- Key sentence: assignment only moves a *name*. The -6 object is untouched and still in d._prev = {10, -6}; trace walks references through _prev, never names.
+- Block 0 complete.
+
+### Block 1: a gradient on every node (resumed 24 Oct)
+- grad starts at 0.0, not None: a node that doesn't affect L should report 0, and grads get used in arithmetic (None + 1 errors).
+- dL/dL = 1 ✓. Reasoning slip: L becomes L + h, so it rises *by* h; h/h = 1.
+- Predicted L.grad shows 0.0 straight after adding the attribute ✓: initialised, not computed. Something has to fill the true values in; that's backprop.
+- Bug: added self.grad but draw_dot didn't show it. Storing an attribute doesn't display it; added a `| grad` field to the record label.
+- Block 1 complete.
+
+### Block 2: backprop by hand through L = (a*b + c)*f
+- On paper: dL/dL = 1, dL/dd = f = -2, dL/df = d = 4, dL/de = -2, dL/dc = -2, dL/da = 6, dL/db = -4.
+- Used the right rule for a product (other input), not L / d, which only matches by coincidence for a product and breaks at e (-8 / -6 = 1.33).
+- dd/de = dd/dc = 1: a + node passes a nudge straight through.
+- Didn't know the chain rule; built it from nudges: e up h -> d up h -> L up -2h -> dL/de = -2.
+- Chain rule in my words: dL/de = dd/de x dL/dd, i.e. local derivative x gradient flowing in. ✗ First wrote de/dd (upside down; hidden because both are 1).
+- ✗ dL/db sign slip (said 4): 2 x -2 = -4.
+- Set grads by hand + draw_dot: e box showed 0.0. The Block 0 trap for real: e = a + a had moved the name e, so e.grad = -2 set the grad on the (data 4) a + a object, outside L's graph. The -6 node keeps the *label* 'e' (a string), but labels and names are separate.
+- Fix: deleted e = a + a (cleaner than digging the node out of d._prev with `is not c`). Still 0 at first: deleting a line edits code, not kernel state; had to re-run cell 2 (fresh objects, grads 0) then cell 7.
+- All seven grads now drawn correctly.
+- Numerical check (central difference, h = 0.001, plain-float L_of so the check is independent of the Value class): a, b, c, f all match the hand values ✓.
+  - Predicted only approximate due to floating point ✓. Sharper: L is linear in each single input, so the central difference is mathematically exact; any error is pure rounding.
+  - e and d aren't inputs to L_of, so there's nothing to nudge; checkable with e.g. (e + c)*f. Open question: does it mean anything to nudge e when in the real graph e can't change without a or b?
+  - Asked why 2h: rise / run, and a-h to a+h is a gap of 2h.
+  - Asked why a+h and a-h rather than (f(x+h) - f(x))/h: that is the textbook (limit) definition; for a finite h central is more accurate, error proportional to h^2 not h (my own session 1 result with x^3).
+- Block 2 complete.
+
+### Block 3: one optimisation step (leaf.data += 0.01 * leaf.grad)
+- Predicted L goes up ✓. Sharper reason: each leaf moves in the sign of its own gradient, so each contributes grad x 0.01 x grad = 0.01 grad^2 >= 0. (I first said "nudging the gradients": it's the data that moves.)
+- Didn't give a size; gradient prediction = 0.01 x (36 + 16 + 4 + 16) = 0.72, so L ~ -7.28.
+- ✗ Ran the nudge cell twice and got -6.59: each run steps again from the new values. One step: -7.29 (rise 0.71).
+- ✗ Name/object trap #3: the checker cell's `a, b, c, f = 2.0, ...` rebound the names to floats, so the editor flagged a.data (float has no .data). Renamed to a0..f0.
+- L doesn't update itself: L.data was computed once and stored as a number. Recomputing from the leaves = a forward pass, run explicitly; backprop is the reverse sweep.
+- Why 0.71 not 0.72: (a + da)(b + db) = ab + b da + a db + da db. Gradients only give the one-at-a-time terms; the cross term da x db (two small nudges multiplied, so ~ step^2) is missed. Gradients are a linear approximation, good only for small steps. (Reached for the (a + b)^2 pattern first.)
+- Block 3 complete.
+- Paused 24 Oct, 21:35. Next: Block 4 (tanh neuron) + reflection, ~1 hr with the video.
