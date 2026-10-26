@@ -4,7 +4,7 @@ A scalar-valued autograd engine and a tiny neural net library on top of it.
 
 - [x] Numerical derivatives
 - [x] `Value` class: `__add__`, `__mul__`, `_prev`, `_op`
-- [ ] Manual backprop through an expression, then a tanh neuron
+- [x] Manual backprop through an expression, then a tanh neuron
 - [ ] `_backward` closures + topological sort → `backward()`
 - [ ] Hit the `=` vs `+=` gradient bug myself
 - [ ] `Neuron` → `Layer` → `MLP`, training loop

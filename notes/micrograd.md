@@ -101,3 +101,31 @@ Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical on
 - Why 0.71 not 0.72: (a + da)(b + db) = ab + b da + a db + da db. Gradients only give the one-at-a-time terms; the cross term da x db (two small nudges multiplied, so ~ step^2) is missed. Gradients are a linear approximation, good only for small steps. (Reached for the (a + b)^2 pattern first.)
 - Block 3 complete.
 - Paused 24 Oct, 21:35. Next: Block 4 (tanh neuron) + reflection, ~1 hr with the video.
+
+## Session 4: 26 Oct 2026 (micrograd 2 cont.: Block 4 tanh neuron + reflection, video ~52:50 to ~1:09)
+
+### Block 4: a tanh neuron (x1 = 2, x2 = 0, w1 = -3, w2 = 1, b = 6.8813..., n = x1w1 + x2w2 + b, o = tanh(n))
+- A neuron: weighted sum + bias (linear), then ONE non-linear squash. Without it, stacked neurons collapse into one linear function.
+- b = bias: shifts where the neuron switches on. (Reused the name b: the old graph's b node is untouched.)
+- d/dn tanh(n) = 1 - tanh(n)^2 = 1 - o^2. Couldn't derive yet (need the quotient rule + d/dx e^2x): to revisit. Checked it numerically instead.
+  - Gap from the central difference ~1e-7: truncation (tanh is curved, error ~ h^2), not rounding (~1e-13). Unlike L, which was linear in each input.
+  - Near tanh = +-1, slope ~ 0: saturation, so gradients vanish there.
+- Why b = 6.8813...: worked backwards so that o = 1/sqrt2 = 0.7071, so 1 - o^2 = 0.5 exactly: clean hand arithmetic.
+- tanh method: first version returned the derivative, took an extra n and returned a float. Fixed: forward pass only, out = Value(math.tanh(self.data), (self,), 'tanh'). (self,) needs the comma: set(self) would try to loop over a Value.
+- Hand gradients: o 1, n 0.5, + nodes pass 0.5 (x1w1x2w2, b, x1w1, x2w2), x1 = -3 x 0.5 = -1.5, w1 = 2 x 0.5 = 1, x2 = 1 x 0.5 = 0.5, w2 = 0 x 0.5 = 0.
+  - ✗ Predicted x2 AND w2 = 0 "because 1 x 0 = 0": reasoned from the node's value (method B again). Only w2 is 0: d(x2w2)/dw2 = x2 = 0. If x2 = 0, nudging w2 can't move x2*w2.
+  - ✗ First gave local derivatives only (1, -3, 2); forgot x gradient flowing in. Then asked whether x1 needs x 0.5 again: no, the 0.5 enters once, at tanh.
+- draw_dot(o) with all hand grads ✓.
+- numgrad (o_of with plain floats, x1_0 etc. so the Values aren't overwritten): all four match ✓. w2 comes out exactly 0.0 (x2 = 0, so both calls compute the identical number); the others are off by ~1e-7 (tanh is curved: truncation, not rounding).
+  - ✗ First version moved the nudged variable to the first argument: positional args fill slots by order, so it fed x2 into the x1 slot. Keep the order and move only the +-h (or use keyword args).
+  - ✗ Said w2 is exact "because it is zero": w2 = 1; it's x2 that is 0.
+- Block 4 complete.
+
+### Reflection (micrograd 2)
+- Learned: I can now use the chain rule to find the impact of an early node on the final node, by multiplying the derivatives linking those nodes together (local derivative x gradient flowing in, one node at a time).
+- Surprised: gradients predicted the one-step gain as 0.72 but it was 0.71. They only see one input moving at a time and miss the cross terms, so they're a linear approximation, only good for small steps.
+- Question it opened: what happens to a gradient when one node feeds into two places? Does a single node have separate gradients? (cf. e = a + a and _prev being a set: next session.) Bigger picture: how do many neurons work together to output text?
+- CS x Phil: w2 has the potential to matter to o, but here it can't show any effect because its derivative is made zero by its pairing (x2 = 0). x2 = 0 is a *background condition*: w2's effect is real but conditional (like a match without oxygen).
+  - Open: if a gradient of 0 can hide a real causal effect, can a 0 ever be trusted to mean "this doesn't matter"? Same problem for gradient-based feature importance in ML interpretability.
+- Tidy-up still to do: micrograd/viz.py is empty (draw_dot lives in the notebook); empty duplicate micrograd/micrograd/01_derivatives_value.ipynb.
+- micrograd 2 complete (26 Oct).
