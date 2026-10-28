@@ -1,0 +1,10 @@
+{
+  "name": "zero-to-hero",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y graphviz && pip install --index-url https://download.pytorch.org/whl/cpu torch && pip install -r requirements.txt",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-toolsai.jupyter"]
+    }
+  }
+}
