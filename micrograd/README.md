@@ -5,8 +5,9 @@ A scalar-valued autograd engine and a tiny neural net library on top of it.
 - [x] Numerical derivatives
 - [x] `Value` class: `__add__`, `__mul__`, `_prev`, `_op`
 - [x] Manual backprop through an expression, then a tanh neuron
-- [ ] `_backward` closures + topological sort → `backward()`
-- [ ] Hit the `=` vs `+=` gradient bug myself
+- [x] `_backward` closures + topological sort → `backward()`
+- [x] Hit the `=` vs `+=` gradient bug myself
+- [x] tanh rebuilt from `exp`, `**`, `-`, `/` (same gradients)
 - [ ] `Neuron` → `Layer` → `MLP`, training loop
 - [ ] Cross-check gradients against PyTorch
 

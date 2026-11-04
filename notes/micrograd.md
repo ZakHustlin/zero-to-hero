@@ -129,3 +129,37 @@ Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical on
   - Open: if a gradient of 0 can hide a real causal effect, can a 0 ever be trusted to mean "this doesn't matter"? Same problem for gradient-based feature importance in ML interpretability.
 - Tidy-up still to do: micrograd/viz.py is empty (draw_dot lives in the notebook); empty duplicate micrograd/micrograd/01_derivatives_value.ipynb.
 - micrograd 2 complete (26 Oct).
+
+## Session 5: 4 Nov 2026 (micrograd 3 cont.: Block 3 the `=` vs `+=` bug, Block 4 tanh from exp, video ~1:22 to ~1:39)
+
+### Block 3: the bug, before he shows it
+- b = a + a: should be a.grad = 2 (nudge a by h, b rises by 2h). Old code gave 1: `self` and `other` are the same object, and line 2's `=` overwrites line 1's share.
+  - ✗ Value instead of gradient three times in a row: said "2a" (that's b's value), "b is still 6", "a.grad = 6". Check: am I being asked for `.data` or a rate?
+  - ✗ Said `set((a, a))` has no elements: a set drops duplicates, so it's {a}, one element. Side issue: the bug is in the closure, not `_prev`.
+- Fix: `=` → `+=` in all five grad writes. Works only because grad starts at 0.0 (None + 1 is a TypeError).
+- ✗ Wrote `b._backward()` instead of `b.backward()`: b.grad still 0, so a.grad = 0. And `label='b'` makes a new variable; `b.label = 'b'` sets the attribute.
+- Two routes: a = -2, b = 3, d = a*b = -6, e = a+b = 1, f = d*e = -6. d.grad = e = 1, e.grad = d = -6.
+  - a: via d, b*d.grad = 3; via e, 1*e.grad = -6; total -3. b: via d, a*d.grad = -2; via e, -6; total -8.
+  - ✗ First b attempt: multiplied by b instead of a, and used e's value (1) instead of e.grad (-6).
+  - Central difference on plain-float f_of: -3 and -8 ✓. With `+=` the Value version matches.
+- With the old `=`, a.grad would be 3 or -6 depending on which closure ran last (set order). Worse than a fixed wrong answer because a test can pass one run and fail the next: hard to detect and reproduce. (Not convinced at first; open.)
+- backward() twice without rebuilding: a = -9, b = -24, i.e. 3x not 2x. d and e (never reset) double, then push doubled grads onto leaves that still hold the first 1x: 1x + 2x = 3x. Fix: zero every .grad (to 0.0) before each backward(); PyTorch's zero_grad(). Needed for the training loop.
+- Block 3 complete.
+
+### Block 4: tanh from exp and division
+- exp: d(e^x)/dx = e^x = out.data, which the closure can already see (closure = inner function that keeps access to self/out after the method returns).
+  - ✗ First version was the identity: Value(self.data) and 1 * out.grad. Fixed: math.exp(self.data), out.data * out.grad.
+  - ✗ AttributeError: class cell not re-run after editing. Check: Value(1).exp() gives e, x.grad = e ✓.
+- __pow__ (int/float only): k*x^(k-1). A Value power would be a graph node needing d/dk too (variable in the exponent, a different rule), so assert it away.
+  - ✗ Predicted 2 and 3 (gave k and x, not the rule). Correct: x^2 at 3 -> 6; x^-1 at 2 -> -0.25 (said 1/4: sign).
+  - ✗ `x2 = Value(3.0); y = x**2`: squared x, not x2. Got 3.75 = -0.25 + 4 (accumulation) and x2.grad = 0. Also printed the objects, not .grad.
+- __neg__ = self * -1, __sub__ = self + (-other), __truediv__ = self * other**-1. No _backward needed: they build graphs of *, +, ** nodes that already have one.
+  - ✗ First versions called themselves (-self inside __neg__): infinite recursion. ✗ 1/other needs __rtruediv__, which doesn't exist.
+- r-methods are needed when the plain number is on the LEFT (1 - e, 2 * n, 2 / e). ✗ Had all five flipped first time. The neuron needs only __rmul__ (2*n), already there.
+- neuron_exp(): e = (2*n).exp(); o = (e - 1)/(e + 1). Same o = 0.7071 and same leaf grads (x1 -1.5, w1 1, x2 0.5, w2 0, n 0.5) ✓.
+  - ✗ Copied neuron() without changing the tanh line; then used the Block 0 by-hand ladder (can't reach unnamed nodes; that's what backward() is for).
+  - ✗ Deleted the `n = ...` line, so neuron_exp used the global n from an old graph. Five runs added 0.5 each: every leaf exactly 5x. Name/object + accumulation in one silent bug.
+- e is computed once and used twice (e - 1, e + 1), which is why its grad needs +=.
+- Where to draw the line around an "operation": a big node (tanh) means supplying its derivative yourself, but a smaller, faster graph; many small nodes need only basic derivatives and backprop chains them, at the cost of size/speed. Any grouping is correct if each local derivative is. PyTorch keeps tanh as one op.
+- Block 4 complete. micrograd 3 complete (4 Nov). Reflection still to write.
+
