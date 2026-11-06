@@ -163,3 +163,23 @@ Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical on
 - Where to draw the line around an "operation": a big node (tanh) means supplying its derivative yourself, but a smaller, faster graph; many small nodes need only basic derivatives and backprop chains them, at the cost of size/speed. Any grouping is correct if each local derivative is. PyTorch keeps tanh as one op.
 - Block 4 complete. micrograd 3 complete (4 Nov). Reflection still to write.
 
+
+## Session 6: 6 Nov 2026 (micrograd 3 close-out + micrograd 4)
+
+### Opener: who writes to a.grad? (a = 4, p = 5*a, q = a*a, r = a + 1, s = p + q + r)
+- First attempt: "p and q write once each", shares unclear, `=` gives 1. Not solid: re-taught from scratch.
+- Method: (1) list every line with `a` on the right-hand side, since each is a closure that writes to `a`; (2) share = local derivative × that node's `.grad`; (3) add.
+- p: 5 × 1 = 5. q: self and other are both `a`, so two writes of 4 × 1 = 8 (the product rule, 2a, appears by itself). r: 1 × 1 = 1. Total 14 = 5 + 2a + 1 ✓. With `=`: whichever write lands last (5, 4 or 1), never 14.
+- Check 1 (u = a*b, v = u + a): found both routes; gave local derivatives and b + 1 rather than numbers (6), and no × out.grad (hidden because out.grad = 1).
+- Check 2 (z = v * 10): chain along one route right (10 × 1 × 5 = 50). ✗ missed the second route (v's closure writes 1 × 10 = 10), total 60. ✗ gave dv/du = 1 as u.grad (u.grad = 10: .grad is always d(final)/d(node), the local derivative only links neighbours). ✗ said z's closure must run before u's; the direct prerequisite is v's (it sets u.grad).
+- Pattern: skipping step 1 of the method (finding *every* route).
+
+### Reflection on micrograd 3
+- Learned (Zak): "not using += can cause inaccuracy when the same variable is used to calculate one gradient, as the data gets overwritten as it is being added. eg. if we have a * a then self = a and other = a, but a gets overwritten midway"
+  - Fix: it's a.grad that's overwritten, not data; and it's any node used more than once (two closures or one), not only a*a.
+- Surprised (Zak): "the data values remained the same for x1, x2 .. after switching the tan identity for its form with e"
+  - Fix: the gradients (and o.data). Point: a different graph for the same function gives the same derivatives.
+- Causation (two routes, a = -2, b = 3, f = (ab)(a+b)): first said the routes are independent ("differing relations"). Tested with a nudge of 1: f stays -6, gradient predicted -3. Expansion: e·Δd + d·Δe + Δd·Δe = 3 - 6 + 3 = 0. The cross term belongs to neither route: it's their interaction, 3h² for a nudge h, so it vanishes faster than the route terms.
+  - Zak's conclusion: "The routes arent independent, considering that they have a direct relation to one another via the (d + delta d)(e + delta e) example, but they are distinct to one another. The seperate mechanisms are irrelevant to the fact that they still interact, meaning they are dependent."
+  - Qualifier to add: additive exactly for the derivative (infinitesimal nudge), interacting for any finite change. Distinct ≠ independent.
+- micrograd 3 closed.
