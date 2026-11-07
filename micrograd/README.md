@@ -8,7 +8,7 @@ A scalar-valued autograd engine and a tiny neural net library on top of it.
 - [x] `_backward` closures + topological sort → `backward()`
 - [x] Hit the `=` vs `+=` gradient bug myself
 - [x] tanh rebuilt from `exp`, `**`, `-`, `/` (same gradients)
-- [ ] `Neuron` → `Layer` → `MLP`, training loop
+- [x] `Neuron` → `Layer` → `MLP`, training loop
 - [ ] Cross-check gradients against PyTorch
 
 ## Backprop in my own words

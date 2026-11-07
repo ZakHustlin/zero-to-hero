@@ -183,3 +183,47 @@ Is a gradient a *causal* claim ("nudging a changes L") or only a mathematical on
   - Zak's conclusion: "The routes arent independent, considering that they have a direct relation to one another via the (d + delta d)(e + delta e) example, but they are distinct to one another. The seperate mechanisms are irrelevant to the fact that they still interact, meaning they are dependent."
   - Qualifier to add: additive exactly for the derivative (infinitesimal nudge), interacting for any finite change. Distinct ≠ independent.
 - micrograd 3 closed.
+
+### micrograd 4 (7 Nov 2026, 16:32–19:10, video ~1:43:55 → end)
+Approach changed: new Python syntax (zip, generators in sum, __call__, list comprehensions) is watch-then-rebuild-from-memory; reasoning questions are still predict-first.
+
+**Block 2: Neuron**
+- `act = sum((wi*xi for wi, xi in zip(self.w, x)), self.b)`; `return act.tanh()`. ✓
+- `Neuron(2)`: the 2 is nin (2 random weights + 1 bias), not a list. zip gives [(w1, 2.0), (w2, 3.0)].
+- `wi * xi`: __mul__ wraps the float as Value(xi). ✓
+- `sum` starts at plain 0: `0 + Value` needs __radd__ (✗ said __add__). Starting at self.b gives the same value but saves a Value(0) leaf and a + node: graph size, not correctness (✗ said "real node may not begin at 0").
+- Node count for Neuron(2): 5 leaves (w1, w2, x1, x2, b) + 5 ops (2 *, 2 +, tanh) = 10. ✗ Said 2 leaves (forgot inputs become Values, and b).
+- Output changes each run: random.uniform in __init__. Fine; training moves them; random.seed(0) to reproduce.
+
+**Block 3: Layer, MLP, parameters()**
+- Parameter count MLP(3, [4,4,1]): 4×(3+1) + 4×(4+1) + 1×(4+1) = 16 + 20 + 5 = 41.
+  - ✗ First attempt used layer 1's 16 *parameters* as layer 2's inputs. Each neuron outputs ONE number, so layer 2 gets 4 inputs. Also stopped at two layers.
+- Bugs in first Layer/MLP: `__initII` typo; `sz = (nin) + nouts` (round brackets don't make a list: int + list TypeError; need [nin]); generators `( ... for ...)` instead of lists.
+  - Generators are one-shot: tested, first call returned a generator object, second call returned the input [2.0, 3.0, -1.0] unchanged with no error. Silent bug, same family as `=` vs `+=`.
+- ✗ `return outs[0]` unconditionally: hidden layers then pass on one Value, next layer's zip fails. Fix: `outs[0] if len(outs) == 1 else outs`.
+- parameters(): Neuron `self.w + [self.b]` (given). Layer: loop + extend (✗ first appended Neuron objects with no return, `_` as a used loop variable). MLP: ✗ copied `self.neurons`; fixed to self.layers. len = 41 ✓.
+- Concept: neuron = weighted vote + squash; layer = several neurons re-describing the input; stacking = features of features; MLP = one function with 41 knobs; training = turning the knobs.
+- Without tanh: y = w2(w1 x + b1) + b2 = (w2w1)x + (w2b1 + b2), a straight line. Expansion ✓. ✗ Said "increasing" and that stacking gives "an increasingly large score". Point: linear layers collapse into one, so depth adds nothing. tanh's real job is non-linearity; squashing is a side benefit (ReLU doesn't squash).
+
+**Block 4: loss + one step**
+- Loss = Σ (ypred − y)². Min 0 (all four exact) ✓. Max: ✓ 4 per example, ✗ didn't scale to 16 total (never reached: tanh never hits ±1). Square so errors can't cancel (+0.5 and −0.5) and big errors cost more.
+- `loss = sum((yout-ygt)**2 for ygt, yout in zip(ys, ypred))` ✓ (sum from 0 uses __radd__).
+- Kernel restarted after a break: NameError MLP. Re-run cells in order; not Run All (placeholder cells).
+- ✗ Thought the minus in `-0.05 * p.grad` cancels a negative grad. It always steps against the gradient: +grad → p decreases, −grad → p increases.
+- ✗ Printed n.layers... (Block 3's MLP, not in the loss graph): exact 0.0. An exact 0 is a clue. On mlp: w[0].grad = 0.120. Positive → increasing w raises loss; step lowers w ✓.
+- ✗ Rebuilt `mlp = MLP(...)` after the step: label moved to a new random network, stepped one thrown away (name/object). Fixed: before 4.84, after 2.15.
+
+**Block 5: training loop**
+- "Forward pass" = `ypred = [mlp(x) for x in xs]` (didn't know the term).
+- Loop: forward, loss, zero grads, backward, update, print; MLP built once outside.
+- Missing step reasoned out: without zeroing, p.grad after lap 2 = lap 1 + lap 2 gradients ✓ (and by lap 20, all 20).
+- Results: without zero_grad 4.7 → 1.2e-5; with 5.41 → 0.050. Buggy run looked *better*: accumulated grads act like a growing step size, which happens to help on a 4-point problem (and different random starts). At lr 0.5 (Claude's check) the buggy loop sticks at 8.0: two outputs saturate at ±1 on the wrong side, 1 − o² ≈ 0, gradients die. Lesson: a falling loss doesn't prove the code is right.
+- Learning-rate sweep skipped (time).
+
+**Wrap**
+- CS×Phil (Zak): "The question is deeper than a yes/no, but my instinct is no. The network seems to have just done arithmetic on numbers and stored them, it is difficult to argue that it has learnt how to do anything"
+  - Sharper: arithmetic isn't the issue. 41 parameters vs 16 numbers of data: bigger than its own lookup table, so not compression by the §4 zip test. 4 points underdetermine the function. The test is held-out data (train/test split).
+- Learned (Zak): "the inputs feed to neurons which feed to layers which finally feed to the mlp". Thin; the MLP is the whole network. Better: the loop runs forward, loss, zero, backward, update, and each lap moves all 41 knobs a little downhill.
+- Surprised (Zak): "forgetting to initialise the gradients to 0 could leave us with a lower loss function, which makes the model look deceivingly effective"
+- Recurring: name/object (n vs mlp; rebuilding mlp mid-cell); parameter count vs output count; value vs gradient.
+- micrograd 4 complete (7 Nov). Next: micrograd 5 (PyTorch cross-check, README, push).
