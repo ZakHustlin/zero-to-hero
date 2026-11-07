@@ -227,3 +227,11 @@ Approach changed: new Python syntax (zip, generators in sum, __call__, list comp
 - Surprised (Zak): "forgetting to initialise the gradients to 0 could leave us with a lower loss function, which makes the model look deceivingly effective"
 - Recurring: name/object (n vs mlp; rebuilding mlp mid-cell); parameter count vs output count; value vs gradient.
 - micrograd 4 complete (7 Nov). Next: micrograd 5 (PyTorch cross-check, README, push).
+
+### Retention check (7 Nov, after micrograd 4, cold)
+1. Gradient of −2: ✓ dL/dw = −2. ✗ Then talked about nudging the *gradient* ("nudge this gradient up by 2 → no impact"). You nudge the weight: w up by h → L down by ~2h, so the update increases w. Value vs gradient again.
+2. Why reverse order: ✗ said otherwise you'd get dx/dL instead of dL/dx. Real reason: a node's grad must be final (every node it feeds has added its share) before it pushes back; starting at L (grad 1) gives dL/d(every node) in one sweep, which is what training needs (one loss, many parameters).
+3. `+=`: ✓ shares from every route add up. Missed the second half: zero each lap or last lap's grads are still there.
+4. Non-linearity: ✗ "the whole training loop is across a single gradient". Real reason: linear layers multiply out to one linear function, so depth adds nothing and the network can only fit straight lines/planes.
+5. Loss near 0: ✓ a bug can still drive the loss down. ✗ "weights wrong in both directions" (squared loss can't cancel). Missed: fitting the training data ≠ generalising (41 params, 4 points; held-out data).
+- To redo cold at the start of micrograd 5: 2 and 4.
