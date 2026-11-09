@@ -235,3 +235,41 @@ Approach changed: new Python syntax (zip, generators in sum, __call__, list comp
 4. Non-linearity: ✗ "the whole training loop is across a single gradient". Real reason: linear layers multiply out to one linear function, so depth adds nothing and the network can only fit straight lines/planes.
 5. Loss near 0: ✓ a bug can still drive the loss down. ✗ "weights wrong in both directions" (squared loss can't cancel). Missed: fitting the training data ≠ generalising (41 params, 4 points; held-out data).
 - To redo cold at the start of micrograd 5: 2 and 4.
+
+
+## Session 7: 9 Nov 2026 (micrograd 5, 21:10–23:00)
+Notebook: `micrograd/05_pytorch_tanh.ipynb`. Video ~1:39–1:43 (PyTorch), then two experiments of our own.
+
+### Block 0: cold recall (paper)
+- Why reverse topological order: first said "to sum gradients from several paths" (✗ that's `+=`) and "compute until the final node" (✗ backward *starts* at the final node). After scaffolding (c feeds d and e; c's closure runs between them): "only once its grad is correct, ie once every node that connects to it has been accounted for". Polish: **final**, not correct; nodes that **use** it, not "connect to". Missed: an early run passes a partial gradient to c's inputs and never runs again, so the error is permanent and silent.
+- No tanh: y = mx + c ✓; 10 layers no better than 1 ✓. Tighten: m = w2w1, c = w2b1 + b2; it's what the model can *represent*, not accuracy after training.
+- grad −2, w up 0.01: first "loss gets smaller because the gradient gets closer to 0, identical to target" (✗ value vs gradient). With the rate analogy: −2 × 0.01 = −0.02 ✓, then "negative so the loss goes up" ✗ (fixed: down by 0.02). Update moves w up by 0.1 ✓.
+
+### Block 1: one neuron in PyTorch
+- First prediction: x1 −3, w1 2, x2 1, w2 0, b 1: local derivatives of n, all missing × n.grad (the "× gradient flowing in" slip again). Then guessed "multiply by 0.7" (✗ o's value, not a gradient). n.grad = 1 − o² = 0.5 → −1.5, 1, 0.5, 0, 0.5 ✓. Labelled 0.5 as "o gradient" (it's n.grad; o.grad = 1).
+- requires_grad default False: efficiency ✓; ✗ said b doesn't need a gradient. Rule: whatever the update changes needs a grad; only the inputs x1, x2 don't (data, not knobs).
+- `.item()`: ✗ said it gives the tensor; it gives a plain Python float.
+- Tensor: one node holds a whole array; one op does many multiply-adds. (Told, not found.)
+- float32 ≈ 7 sig figs ✓; float64 said 14 (twice tonight): it's ~16.
+
+### Block 2: cross-check the whole MLP
+- `torch_forward`: first `math.tanh(w*x + b)` (✗ no `.sum()`, so 3 numbers not 1; ✗ math.tanh returns a float with no graph). Fixed: `torch.tanh((w*x).sum() + b)`, stacked per layer ✓.
+- Seed 1, MLP(3, [4,4,1]): loss 6.24427205907587 in both; **max grad disagreement 4.4e-16** (predicted ~1e-15 ✓). Not exactly 0: float addition isn't associative ((0.1+0.2)+0.3 ≠ 0.1+(0.2+0.3)); the engines add in different orders.
+- What agreement proves (Zak): same structure, but both could be wrong if the structure is wrong. Added: wrong function built (torch_forward mirrors yours); coverage (exp, /, ** never used by the MLP); shared maths. The numerical check shares nothing with backprop, so it's a more independent witness despite being less precise.
+- Planted bug (tanh `_backward`: 1 − t instead of 1 − t²; three characters, not one as I first said). Predicted "falls" ✓: 6.24 → 0.070 in 30 steps. Cross-check: max disagreement **4.65**. Unit test per op localised it to tanh (first said pow, corrected): micrograd 0.463 vs PyTorch 0.711 at x = 0.6; 1 − 0.537² = 0.711 ✓ (wrote "1 − e²": letter slip).
+- Same sign for t in (−1, 1) ✓, but concluded "so it doesn't point downhill" ✗: same sign means still roughly downhill, wrong size (factor 1 + t), and bent overall. Seeds 0 and 2 with the bug get stuck (2.7, 7.9). Lesson: a buggy engine can pass a training run by luck; only an independent gradient check tests it.
+
+### Block 3: why tanh, by experiment
+- `nonlin` flag: first `if nonlin: return tanh / else: return act.tanh()` (✗ scope: self.nonlin; ✗ bare tanh; ✗ branches). Didn't know what `nonlin` meant; explained. MLP `__init__` missing the `nonlin` argument (silent until an MLP is built).
+- tanh range: said 0 to 1 twice (✗ −1 to 1; 0 to 1 is sigmoid). Reason for a linear last layer: tanh output can never exceed 1.
+- Data x = −1 … 1 in thirds, y = x². No-tanh net: straight line ✓; best line flat (symmetry valid because x² is even *and* the sample points are symmetric) at mean 28/63 = 4/9 ✓ (unsimplified). Floor not computed before running (skipped twice): Σ = 84/81 = **28/27 ≈ 1.037**. Linear net hit **1.03704** by step 30 and stayed for 270 steps, predicting 0.444 everywhere. Model-class failure ✓ (evidence: it reached the exact floor and stopped).
+- With tanh (MLP(1, [8,8,1]), 97 params): loss 0.0067 after 500 steps.
+- Between training points: within ~0.04 (½ → 0.274 vs 0.25). Outside: 1.5 → 1.53, 2 → 1.80, 3 → 1.91 (true 2.25, 4, 9): hidden tanhs saturate, output flattens. Zak: "error grows with distance from the turning point" ✗: it's distance outside the data (interpolation vs extrapolation).
+- CS×Phil (Zak): "it seems to have learnt between −1 and 1, considering its weak extrapolation" ✓. Open: seven points fit "x² everywhere" and "x² then flattens" equally; what entitles any learner to claim a rule? (Hume; Aaronson §7 PAC learning, Wed.)
+
+### Reflection
+- Learned (Zak): "pytorch can use tensors to store and compute multiple array gradients concurrently, improving efficiency." (Note: the part that was told; tonight's discovered lesson is that a falling loss is no evidence of correct gradients.)
+- Surprised (Zak): "to see the straight line function actually hit the precalculated floor."
+- Question (Zak): "how we can explore the problem of induction relating to the neural net learning."
+- Recurring tonight: × gradient flowing in; value vs gradient (0.7, "o gradient"); tanh range; float64 digits; predicting skipped when tired.
+- Not done: stretch (W @ x), README. **Next: README from memory, Tue 10 Nov, before makemore 1.**
