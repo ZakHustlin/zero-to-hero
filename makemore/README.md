@@ -2,7 +2,7 @@
 
 Character-level language models on `names.txt`, from bigram counts to WaveNet.
 
-- [ ] Bigram counts + sampling + NLL loss
+- [x] Bigram counts + sampling + NLL loss
 - [ ] Bigram as a one-layer neural net (should match the counts model)
 - [ ] MLP (Bengio 2003): embeddings, context window, splits, LR sweep
 - [ ] Activations, initialisation, BatchNorm
@@ -11,7 +11,7 @@ Character-level language models on `names.txt`, from bigram counts to WaveNet.
 
 | Model | Train loss | Val loss |
 |---|---|---|
-| Bigram | | |
+| Bigram | 2.454 | — (no split yet) |
 | MLP | | |
 | MLP + BatchNorm | | |
 | WaveNet | | |
